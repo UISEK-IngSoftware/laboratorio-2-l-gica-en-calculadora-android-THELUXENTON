@@ -5,8 +5,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 
+// Estado visible en la interfaz
 data class CalculatorState(val display: String = "0")
 
+// Acciones permitidas en la calculadora
 sealed class CalculatorEvent {
     data class Number(val number: String) : CalculatorEvent()
     data class Operator(val operator: String) : CalculatorEvent()
@@ -17,9 +19,12 @@ sealed class CalculatorEvent {
 }
 
 class CalculatorViewModel : ViewModel() {
+
+    // Variables internas de la lógica del profe
     private var number1: String = ""
     private var number2: String = ""
     private var operator: String? = null
+    private var isResultOnScreen = false
 
     var state by mutableStateOf(CalculatorState())
         private set
@@ -35,39 +40,54 @@ class CalculatorViewModel : ViewModel() {
         }
     }
 
-
+    // --- MAGIA VISUAL: Junta los números y el operador en la pantalla ---
     private fun actualizarPantalla() {
         val opStr = operator ?: ""
+        // Creamos un texto que se ve así: "2 + 3"
         val textoCompleto = "$number1 $opStr $number2".trim()
         state = state.copy(display = if (textoCompleto.isEmpty()) "0" else textoCompleto)
     }
 
     private fun enterNumber(number: String) {
         if (operator == null) {
+            if (isResultOnScreen) {
+                number1 = ""
+                isResultOnScreen = false
+            }
             number1 += number
         } else {
             number2 += number
         }
-        actualizarPantalla()
+        actualizarPantalla() // Actualizamos la vista
     }
 
     private fun enterOperator(op: String) {
         if (number1.isNotBlank()) {
+            // Si ya hay un segundo número y ponemos otro signo, calculamos el intermedio
             if (number2.isNotBlank()) {
                 performCalculation()
             }
             operator = op
-            actualizarPantalla()
+            isResultOnScreen = false
+            actualizarPantalla() // Mostramos el signo en pantalla
         }
     }
 
     private fun enterDecimal() {
-        if (operator == null && !number1.contains(".")) {
-            number1 += if (number1.isEmpty()) "0." else "."
-        } else if (operator != null && !number2.contains(".")) {
-            number2 += if (number2.isEmpty()) "0." else "."
+        if (operator == null) {
+            if (!number1.contains(".")) {
+                if (isResultOnScreen) {
+                    number1 = ""
+                    isResultOnScreen = false
+                }
+                number1 += "."
+            }
+        } else {
+            if (!number2.contains(".")) {
+                number2 += "."
+            }
         }
-        actualizarPantalla()
+        actualizarPantalla() // Mostramos el punto
     }
 
     private fun performCalculation() {
@@ -83,30 +103,37 @@ class CalculatorViewModel : ViewModel() {
                 else -> 0.0
             }
 
+            clearAll()
+
             val resultString = if (result.isNaN()) "Error" else result.toString().removeSuffix(".0")
             number1 = if (result.isNaN()) "" else resultString
-            number2 = ""
-            operator = null
 
             state = state.copy(display = resultString)
+            isResultOnScreen = true
         }
     }
 
     private fun clearLast() {
-        if (number2.isNotEmpty()) {
-            number2 = number2.dropLast(1)
-        } else if (operator != null) {
-            operator = null
-        } else if (number1.isNotEmpty()) {
-            number1 = number1.dropLast(1)
+        if (operator == null) {
+            if (number1.isNotBlank()) {
+                number1 = number1.dropLast(1)
+            }
+            isResultOnScreen = false
+        } else {
+            if (number2.isNotBlank()) {
+                number2 = number2.dropLast(1)
+            } else {
+                operator = null
+            }
         }
-        actualizarPantalla()
+        actualizarPantalla() // Actualizamos después de borrar
     }
 
     private fun clearAll() {
         number1 = ""
         number2 = ""
         operator = null
+        isResultOnScreen = false
         state = state.copy(display = "0")
     }
 }
